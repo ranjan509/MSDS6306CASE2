@@ -1,0 +1,724 @@
+---
+title: "CaseStudy2DDS"
+author: "Ranjan"
+date: "2/4/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+chooseCRANmirror(graphics=FALSE, ind=1)
+knitr::opts_chunk$set(echo = TRUE)
+```
+##packages 
+```{r}
+library(tidyverse)
+library(dplyr)
+library(caret)
+library(class)
+##install.packages("vis_miss")
+##library(vis_miss)
+##install.packages("earth")
+library(earth)
+library(GGally)
+library(readxl)
+```
+### Load Raw Data
+```{r}
+data <- read.csv("CaseStudy2-data.csv",header = TRUE)
+head(data)
+```
+
+```{r}
+length(data)
+#View(data)
+
+```
+#checking missing data
+
+```{r}
+colSums(is.na(data))
+
+###sum(is.na(data))--- 0
+```
+
+## VIsualizing missing data
+There is no missing values in the data.
+```{r}
+##vis_miss(data)
+```         
+         
+###Dropping the columns that does not affect the analysis. This data is based on standard working hours as 80 , working age group greater than 18 years old, and 870 observations as  employee count.ID and Employee are not useful in analysis as well.  
+```{r}
+data <- dplyr::select(data, -c("Over18","EmployeeCount","StandardHours","ID","EmployeeNumber"))
+ ### only 31 observations that is significance in our attrition analysis.
+```
+
+
+
+## percentage of Employee who left the job . 16 percent people left the job.
+```{r ,message = FALSE, warning = FALSE}
+data1<- data %>% group_by(Attrition) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+data1
+
+ggplot(data= data1,aes(x=Attrition,y=  Proportion, fill = EmployeeCount))+geom_bar(stat = "identity")+ scale_fill_gradient2(low= '#971B1E', high = '#FFF200', space='#E1E1E1')
+
+
+ggplot(data1, aes(x = "Attrition", y = Proportion, fill = Attrition)) +
+  geom_col() +
+  coord_polar(theta = "y")+ geom_label(aes(label = Proportion),
+             position = position_stack(vjust = 0.5),
+             show.legend = FALSE) 
+
+```
+
+### Age
+```{r}
+summary(data$Age)
+range(data$Age)
+Agedf <- data %>% group_by(Age)%>% summarise(EmployeeCount =n())
+
+ggplot(data=Agedf,aes(x=Age,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("AGE vs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1') 
+
+ggplot(data, aes_string(x = "Age", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+  xlab("Age") + ylab("Percent numbers of employees") + ggtitle("Age vs Attrition")
+```
+
+```{r}
+range(data$MonthlyIncome)
+```
+
+### Monthly income and Attrition. Less income employee are more likely to quit the job. 
+```{r}
+summary(data$MonthlyIncome)
+range(data$MonthlyIncome)
+
+h<-hist(data$MonthlyIncome, breaks=10, col="red", xlab="Monthly Income", 
+        main="Histogram with for Monthly Income") 
+###Right skewed
+
+##Now grouping the employee based on salary 
+
+data$IncomeGroup <- cut(data$MonthlyIncome, c(0,2000,4000,6000,10000,16000,20000), labels = c("<$2000","$2000-$4000","$4000 - $6000","$6000-$10000","$10000-$16000","$16000-$200000"), include.lowest = TRUE)
+
+
+ggplot(data, aes_string(x = "IncomeGroup", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+   xlab("IncomeGroup") + ylab("Percent numbers of employees") + ggtitle("IncomeGroup vs Attrition")
+```
+
+###BusinessTravel
+```{r}
+data$BusinessTravel <- as.factor(data$BusinessTravel)
+BusinessTraveldf<- data %>% group_by(BusinessTravel) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+BusinessTraveldf
+
+ggplot(data=BusinessTraveldf,aes(x=BusinessTravel,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("Department vs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1') + geom_text(aes(x= BusinessTravel,EmployeeCount + 25, label = EmployeeCount, fill = NULL), data = BusinessTraveldf)
+
+ggplot(data, aes_string(x = "BusinessTravel", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+  xlab("Department") + ylab("Percent numbers of employees") + ggtitle("BusinessTravel vs Attrition")
+
+
+
+ggplot(data,aes_string(x= "BusinessTravel" , y ="MonthlyIncome", fill ="BusinessTravel" ))+geom_boxplot(fill=c('#971B1E'))+ggtitle("Monthly Income vs BusinessTravel")
+
+```
+####Distance from home
+```{r}
+data$DistanceFromHome <- as.factor(data$DistanceFromHome)
+DistanceFromHomedf<- data %>% group_by(DistanceFromHome) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+DistanceFromHomedf
+ggplot(data=DistanceFromHomedf,aes(x=DistanceFromHome,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("DistanceFromHome vs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1') + geom_text(aes(x= DistanceFromHome,EmployeeCount +5, label = EmployeeCount, fill = NULL), data = DistanceFromHomedf) 
+
+ggplot(data, aes_string(x = "DistanceFromHome", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+  xlab("DistanceFromHome") + ylab("Percent numbers of employees") + ggtitle("DistanceFromHome vs Attrition")
+
+```
+
+###Department
+```{r}
+data$Department <- as.factor(data$Department)
+Deparmentdf<- data %>% group_by(Department) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+Deparmentdf
+
+ggplot(data=Deparmentdf,aes(x=Department,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("Department vs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1')+ geom_text(aes(x= Department,EmployeeCount +10, label = EmployeeCount, fill = NULL), data = Deparmentdf)  
+
+ggplot(data, aes_string(x = "Department", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+ xlab("Department") + ylab("Percent numbers of employees") + ggtitle("Department vs Attrition")
+
+
+
+ggplot(data,aes_string(x= "Department" , y ="MonthlyIncome", fill ="Department" ))+geom_boxplot(fill=c('#971B1E'))+ggtitle("Monthly Income vs Department")
+
+```
+####Distance from home
+```{r}
+data$DistanceFromHome <- as.factor(data$DistanceFromHome)
+DistanceFromHomedf<- data %>% group_by(DistanceFromHome) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+DistanceFromHomedf
+
+ggplot(data=DistanceFromHomedf,aes(x=DistanceFromHome,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("DistanceFromHome vs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1') 
+
+ggplot(data, aes_string(x = "DistanceFromHome", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+  xlab("DistanceFromHome") + ylab("Percent numbers of employees") + ggtitle("DistanceFromHome vs Attrition")
+
+
+```
+
+###Education
+```{r}
+data$Education <- as.factor(data$Education)
+Educationdf <-data %>% group_by(Education) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+Educationdf
+ggplot(data=Educationdf,aes(x=Education,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("Educationvs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1') + geom_text(aes(x= Education,EmployeeCount +5, label = EmployeeCount, fill = NULL), data = Educationdf) 
+
+ggplot(data, aes_string(x = "Education", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+  xlab("Education") + ylab("Percent numbers of employees") + ggtitle("Education vs Attrition")
+
+ggplot(data,aes_string(x= "Education" , y ="MonthlyIncome", fill ="Education" ))+geom_boxplot(fill=c('#971B1E'))+ggtitle("Education vs MonthlyIncome")
+```
+
+###Educationfield
+```{r}
+data$EducationField <- as.factor(data$EducationField)
+EducationFielddf <-data %>% group_by(EducationField) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+EducationFielddf
+ggplot(data=EducationFielddf,aes(x=EducationField,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("Educationvs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1') + geom_text(aes(x= EducationField, EmployeeCount +7, label = EmployeeCount, fill = NULL), data = EducationFielddf)
+
+ggplot(data, aes_string(x = "EducationField", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+  geom_abline(slope = 0, intercept = .16) + xlab("EducationField") + ylab("Percent numbers of employees") + ggtitle("EducationField vs Attrition")
+
+ggplot(data,aes_string(x= "EducationField" , y ="MonthlyIncome", fill ="EducationField" ))+geom_boxplot(fill=c('#971B1E'))+ggtitle("Education Field vs MonthlyIncome")
+
+```
+
+
+### Environment Satisfaction
+```{r}
+data$EnvironmentSatisfaction <- as.factor(data$EnvironmentSatisfaction)
+EnvironmentSatisfactiondf <-data %>% group_by(EnvironmentSatisfaction) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+
+ggplot(data=EnvironmentSatisfactiondf,aes(x=EnvironmentSatisfaction,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("EnvironmentSatisfaction vs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1')+ geom_text(aes(x= EnvironmentSatisfaction, EmployeeCount +7, label = EmployeeCount, fill = NULL), data = EnvironmentSatisfactiondf)
+
+ggplot(data, aes_string(x = "EnvironmentSatisfaction", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+  geom_abline(slope = 0, intercept = .16) + xlab("EnvironmentSatisfaction") + ylab("Percent numbers of employees") + ggtitle("EnvironmentSatisfaction vs Attrition")
+
+ggplot(data,aes_string(x= "EnvironmentSatisfaction" , y ="MonthlyIncome", fill ="EnvironmentSatisfaction" ))+geom_boxplot(fill=c('#971B1E'))+ggtitle("EnvironmentSatisfaction vs MonthlyIncome")
+```
+
+###Gender
+```{r}
+data$Gender <- as.factor(data$Gender)
+Genderdf <-data %>% group_by(Gender) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+Genderdf
+ggplot(data=Genderdf,aes(x=Gender,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("Gender vs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1')+ geom_text(aes(x= Gender, EmployeeCount +15, label = EmployeeCount, fill = NULL), data = Genderdf)
+
+
+ggplot(data, aes_string(x = "Gender", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+  xlab("Gender") + ylab("Percent numbers of employees") + ggtitle("Gender vs Attrition")
+
+ggplot(data,aes_string(x= "Gender" , y ="MonthlyIncome", fill ="Gender" ))+geom_boxplot(fill=c('#971B1E'))+ggtitle("Gender vs MonthlyIncome")
+```
+
+###JobInvolvement
+```{r}
+data$JobInvolvement <- as.factor(data$JobInvolvement)
+JobInvolvementdf <-data %>% group_by(JobInvolvement) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+JobInvolvementdf
+
+ggplot(data=JobInvolvementdf,aes(x=JobInvolvement,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("JobInvolvement vs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1') + geom_text(aes(x= JobInvolvement, EmployeeCount +15, label = EmployeeCount, fill = NULL), data = JobInvolvementdf)
+
+ggplot(data, aes_string(x = "JobInvolvement", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+   xlab("JobInvolvement") + ylab("Percent numbers of employees") + ggtitle("Gender vs Attrition")
+
+ggplot(data,aes_string(x= "JobInvolvement" , y ="MonthlyIncome", fill ="JobInvolvement" ))+geom_boxplot(fill=c('#971B1E'))+ggtitle("JobInvolvement vs MonthlyIncome")
+
+```
+
+###JobLevel###important linear relationship
+
+```{r}
+data$JobLevel <- as.factor(data$JobLevel)
+JobLeveldf <-data %>% group_by(JobLevel) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+JobLeveldf
+
+ggplot(data=JobLeveldf,aes(x=JobLevel,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("JobLevel vs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1') + geom_text(aes(x= JobLevel, EmployeeCount +10, label = EmployeeCount, fill = NULL), data = JobLeveldf)
+
+ggplot(data, aes_string(x = "JobLevel", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+   xlab("JobLevel") + ylab("Percent numbers of employees") + ggtitle("JobLevel vs Attrition")
+
+ggplot(data,aes_string(x= "JobLevel" , y ="MonthlyIncome", fill ="JobLevel" ))+geom_boxplot(fill=c('#971B1E'))+ggtitle("JobLevel vs MonthlyIncome")
+
+```
+
+### JobRole . sales representative have higher attrition
+
+```{r}
+data$JobRole <- as.factor(data$JobRole)
+JobRoledf <-data %>% group_by(JobRole) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+JobRoledf
+
+ggplot(data=JobRoledf,aes(x=JobRole,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("JobRole vs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1')+ coord_flip()+ geom_text(aes(x= JobRole, EmployeeCount +10, label = EmployeeCount, fill = NULL), data = JobRoledf) 
+
+ggplot(data, aes_string(x = "JobRole", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+   xlab("JobRole") + ylab("Percent numbers of employees") + ggtitle("JobRole vs Attrition")+coord_flip()
+
+ggplot(data,aes_string(x= "JobRole" , y ="MonthlyIncome", fill ="JobRole" ))+geom_boxplot(fill=c('#971B1E'))+ggtitle("JobRole vs MonthlyIncome")+coord_flip()
+
+```
+
+#### JobSatisfaction.Most of the people are satisfied with their jobs. Low satisfaction lead to higher rates in Attrition
+
+```{r}
+data$JobSatisfaction <- as.factor(data$JobSatisfaction)
+JobSatisfactiondf <-data %>% group_by(JobSatisfaction) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+JobSatisfactiondf
+
+ggplot(data=JobSatisfactiondf,aes(x=JobSatisfaction,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("JobSatisfaction vs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1')+ geom_text(aes(x= JobSatisfaction, EmployeeCount +10, label = EmployeeCount, fill = NULL), data = JobSatisfactiondf)
+
+ggplot(data, aes_string(x = "JobSatisfaction", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+ xlab("JobSatisfaction") + ylab("Percent numbers of employees") + ggtitle("JobSatisfaction vs Attrition")
+
+ggplot(data,aes_string(x= "JobSatisfaction" , y ="MonthlyIncome", fill ="JobSatisfaction" ))+geom_boxplot(fill=c('#971B1E'))+ggtitle("JobSatisfaction vs MonthlyIncome")
+
+```
+
+####MaritalStatus. Most employees are married and single employee has higher attrition and have below average pay (box plot). 
+
+```{r}
+data$MaritalStatus <- as.factor(data$MaritalStatus)
+MaritalStatusdf <-data %>% group_by(MaritalStatus) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+MaritalStatusdf
+
+ggplot(data=MaritalStatusdf,aes(x=MaritalStatus,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("MaritalStatus vs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1')+ geom_text(aes(x= MaritalStatus, EmployeeCount +10, label = EmployeeCount, fill = NULL), data = MaritalStatusdf) 
+
+ggplot(data, aes_string(x = "MaritalStatus", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+ xlab("MaritalStatus") + ylab("Percent numbers of employees") + ggtitle("MaritalStatus vs Attrition")
+
+ggplot(data,aes_string(x= "MaritalStatus" , y ="MonthlyIncome", fill ="MaritalStatus" ))+geom_boxplot(fill=c('#971B1E'))+ggtitle("MaritalStatus vs MonthlyIncome")
+
+```
+
+###NumCompaniesWorked
+
+```{r}
+data$NumCompaniesWorked <- as.factor(data$NumCompaniesWorked)
+NumCompaniesWorkeddf <-data %>% group_by(NumCompaniesWorked) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+NumCompaniesWorkeddf
+
+ggplot(data=NumCompaniesWorkeddf,aes(x=NumCompaniesWorked,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("NumCompaniesWorked vs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1') + geom_text(aes(x= NumCompaniesWorked, EmployeeCount +10, label = EmployeeCount, fill = NULL), data = NumCompaniesWorkeddf) 
+
+ggplot(data, aes_string(x = "NumCompaniesWorked", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+   xlab("NumCompaniesWorked") + ylab("Percent numbers of employees") + ggtitle("NumCompaniesWorked vs Attrition")
+
+ggplot(data,aes_string(x= "NumCompaniesWorked" , y ="MonthlyIncome", fill ="NumCompaniesWorked" ))+geom_boxplot(fill=c('#971B1E'))+ggtitle("NumCompaniesWorked vs MonthlyIncome")
+
+```
+
+###OverTime
+
+```{r}
+data$OverTime <- as.factor(data$OverTime)
+OverTimedf <-data %>% group_by(OverTime) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+OverTimedf
+
+ggplot(data=OverTimedf,aes(x=OverTime,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("OverTime vs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1') + geom_text(aes(x= OverTime, EmployeeCount +15, label = EmployeeCount, fill = NULL), data = OverTimedf) 
+
+ggplot(data, aes_string(x = "OverTime", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+   xlab("OverTime") + ylab("Percent numbers of employees") + ggtitle("OverTime vs Attrition")
+
+ggplot(data,aes_string(x= "OverTime" , y ="MonthlyIncome", fill ="OverTime" ))+geom_boxplot(fill=c('#971B1E'))+ggtitle("OverTime vs MonthlyIncome")
+
+```
+
+###PercentSalaryHike/ Lower monthly income has higher salray hike have higher rate if attrition
+```{r}
+data$PercentSalaryHike <- as.factor(data$PercentSalaryHike)
+PercentSalaryHikedf <-data %>% group_by(PercentSalaryHike) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+PercentSalaryHikedf
+ggplot(data=PercentSalaryHikedf,aes(x=PercentSalaryHike,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("PercentSalaryHike vs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1')+ geom_text(aes(x= PercentSalaryHike, EmployeeCount +5, label = EmployeeCount, fill = NULL), data = PercentSalaryHikedf)
+
+ggplot(data, aes_string(x = "PercentSalaryHike", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+  xlab("PercentSalaryHike") + ylab("Percent numbers of employees") + ggtitle("PercentSalaryHike vs Attrition")
+
+ggplot(data,aes_string(x= "PercentSalaryHike" , y ="MonthlyIncome", fill ="PercentSalaryHike" ))+geom_boxplot(fill=c('#971B1E'))+ggtitle("PercentSalaryHike vs MonthlyIncome")
+
+```
+
+###PerformanceRating. Only rated as 3 or 4. High rated people have higher rate of attrition. 
+```{r}
+data$PerformanceRating <- as.factor(data$PerformanceRating)
+PerformanceRatingdf <-data %>% group_by(PerformanceRating) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+PerformanceRatingdf
+
+ggplot(data=PerformanceRatingdf,aes(x=PerformanceRating,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("PerformanceRating vs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1') + geom_text(aes(x= PerformanceRating, EmployeeCount +15, label = EmployeeCount, fill = NULL), data = PerformanceRatingdf)
+
+ggplot(data, aes_string(x = "PerformanceRating", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+  xlab("PerformanceRating") + ylab("Percent numbers of employees") + ggtitle("PerformanceRating vs Attrition")
+
+ggplot(data,aes_string(x= "PerformanceRating" , y ="MonthlyIncome", fill ="PerformanceRating" ))+geom_boxplot(fill=c('#971B1E'))+ggtitle("PerformanceRating vs MonthlyIncome")
+
+```
+
+###RelationshipSatisfaction. Low relationship satisfaction has higher rate of attrition
+
+```{r}
+data$RelationshipSatisfaction <- as.factor(data$RelationshipSatisfaction)
+RelationshipSatisfactiondf <-data %>% group_by(RelationshipSatisfaction) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+RelationshipSatisfactiondf
+
+ggplot(data=RelationshipSatisfactiondf,aes(x=RelationshipSatisfaction,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("RelationshipSatisfactionvs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1') + geom_text(aes(x= RelationshipSatisfaction, EmployeeCount +10, label = EmployeeCount, fill = NULL), data = RelationshipSatisfactiondf)
+
+ggplot(data, aes_string(x = "RelationshipSatisfaction", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+  xlab("RelationshipSatisfaction") + ylab("Percent numbers of employees") + ggtitle("RelationshipSatisfaction vs Attrition")
+
+ggplot(data,aes_string(x= "RelationshipSatisfaction" , y ="MonthlyIncome", fill ="RelationshipSatisfaction"  ))+geom_boxplot(fill=c('#971B1E'))+ggtitle("RelationshipSatisfaction vs MonthlyIncome")
+
+```
+
+###StockOptionLevel
+```{r}
+data$StockOptionLevel <- as.factor(data$StockOptionLevel)
+StockOptionLeveldf <-data %>% group_by(StockOptionLevel) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+
+ggplot(data=StockOptionLeveldf,aes(x=StockOptionLevel,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("StockOptionLevel vs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1')+ geom_text(aes(x= StockOptionLevel, EmployeeCount +10, label = EmployeeCount, fill = NULL), data = StockOptionLeveldf)
+
+
+ggplot(data, aes_string(x = "StockOptionLevel", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+   xlab("StockOptionLevel") + ylab("Percent numbers of employees") + ggtitle("StockOptionLevel vs Attrition")
+
+ggplot(data,aes_string(x= "StockOptionLevel" , y ="MonthlyIncome", fill ="StockOptionLevel" ))+geom_boxplot(fill=c('#971B1E'))+ggtitle("StockOptionLevel vs MonthlyIncome")
+
+```
+
+###TotalWorkingYears. Income increases with working years. Employee after working 40 years are retiring and have higher rate of attrition. Most people tend to leave job at thier first year. 34-37 years employee are waiting for retirement possibly so no attrition. 
+
+```{r}
+data$TotalWorkingYears <- as.factor(data$TotalWorkingYears)
+TotalWorkingYearsdf <-data %>% group_by(TotalWorkingYears) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+TotalWorkingYearsdf
+
+ggplot(data=TotalWorkingYearsdf,aes(x=TotalWorkingYears,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("TotalWorkingYears vs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1') + geom_text(aes(x= TotalWorkingYears, EmployeeCount +5, label = EmployeeCount, fill = NULL), data = TotalWorkingYearsdf)
+
+ggplot(data, aes_string(x = "TotalWorkingYears", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+  xlab("TotalWorkingYears") + ylab("Percent numbers of employees") + ggtitle("TotalWorkingYears vs Attrition")
+
+ggplot(data,aes_string(x= "TotalWorkingYears" , y ="MonthlyIncome", fill ="TotalWorkingYears" ))+geom_boxplot(fill=c('#971B1E'))+ggtitle("TotalWorkingYears vs MonthlyIncome")
+
+```
+
+###TrainingTimesLastYear. Most employee get trained for 2-3 times a year. 0 and 4 has higher attrition rate. 
+
+```{r}
+data$TrainingTimesLastYear <- as.factor(data$TrainingTimesLastYear)
+TrainingTimesLastYeardf <-data %>% group_by(TrainingTimesLastYear) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+TrainingTimesLastYeardf 
+
+ggplot(data=TrainingTimesLastYeardf,aes(x=TrainingTimesLastYear,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("TrainingTimesLastYear vs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1')+ geom_text(aes(x= TrainingTimesLastYear, EmployeeCount +7, label = EmployeeCount, fill = NULL), data = TrainingTimesLastYeardf) 
+
+ggplot(data, aes_string(x = "TrainingTimesLastYear", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+   xlab("TrainingTimesLastYear") + ylab("Percent numbers of employees") + ggtitle("TrainingTimesLastYear vs Attrition")
+
+ggplot(data,aes_string(x= "TrainingTimesLastYear" , y ="MonthlyIncome", fill ="TrainingTimesLastYear" ))+geom_boxplot(fill=c('#971B1E'))+ggtitle("TrainingTimesLastYear vs MonthlyIncome")
+
+```
+
+###WorkLifeBalance. less worklifebalance higher attrition
+
+```{r}
+data$WorkLifeBalance <- as.factor(data$WorkLifeBalance)
+WorkLifeBalancedf <-data %>% group_by(WorkLifeBalance) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+WorkLifeBalancedf
+
+ggplot(data=WorkLifeBalancedf,aes(x=WorkLifeBalance,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("WorkLifeBalance vs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1')+ geom_text(aes(x= WorkLifeBalance, EmployeeCount +12, label = EmployeeCount, fill = NULL), data = WorkLifeBalancedf)  
+
+ggplot(data, aes_string(x = "WorkLifeBalance", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+   xlab("WorkLifeBalance") + ylab("Percent numbers of employees") + ggtitle("WorkLifeBalance vs Attrition")
+
+ggplot(data,aes_string(x= "WorkLifeBalance" , y ="MonthlyIncome", fill ="WorkLifeBalance" ))+geom_boxplot(fill=c('#971B1E'))+ggtitle("WorkLifeBalance vs MonthlyIncome")
+
+```
+
+###YearsAtCompany. Income increases with time in company. New hires are likely to leave the company.
+
+```{r}
+data$YearsAtCompany <- as.factor(data$YearsAtCompany)
+YearsAtCompanydf <-data %>% group_by(YearsAtCompany) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+YearsAtCompanydf
+
+ggplot(data=YearsAtCompanydf,aes(x=YearsAtCompany,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("YearsAtCompany vs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1') + geom_text(aes(x= YearsAtCompany, EmployeeCount +5, label = EmployeeCount, fill = NULL), data = YearsAtCompanydf)  
+
+ggplot(data, aes_string(x = "YearsAtCompany", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+   xlab("YearsAtCompany") + ylab("Percent numbers of employees") + ggtitle("YearsAtCompany vs Attrition")
+
+ggplot(data,aes_string(x= "YearsAtCompany" , y ="MonthlyIncome", fill ="YearsAtCompany" ))+geom_boxplot(fill=c('#971B1E'))+ggtitle("YearsAtCompany vs MonthlyIncome")
+
+```
+###important
+###YearsInCurrentRole. Employee staying in current role more than 15 years are less likely to leave the job. 
+
+```{r}
+data$YearsInCurrentRole <- as.factor(data$YearsInCurrentRole)
+YearsInCurrentRoledf <-data %>% group_by(YearsInCurrentRole) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+YearsInCurrentRoledf
+
+ggplot(data=YearsInCurrentRoledf,aes(x=YearsInCurrentRole,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("YearsInCurrentRole vs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1') + geom_text(aes(x= YearsInCurrentRole, EmployeeCount +5, label = EmployeeCount, fill = NULL), data = YearsInCurrentRoledf)  
+
+ggplot(data, aes_string(x = "YearsInCurrentRole", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+   xlab("YearsInCurrentRole") + ylab("Percent numbers of employees") + ggtitle("YearsInCurrentRole vs Attrition")
+
+ggplot(data,aes_string(x= "YearsInCurrentRole" , y ="MonthlyIncome", fill ="YearsInCurrentRole" ))+geom_boxplot(fill=c('#971B1E'))+ggtitle("YearsInCurrentRole vs MonthlyIncome")
+
+```
+
+####YearsSinceLastPromotion. 12 and 13 years has low attrition. and 12 years has higher median income
+
+
+```{r}
+data$YearsSinceLastPromotion <- as.factor(data$YearsSinceLastPromotion)
+YearsSinceLastPromotiondf <-data %>% group_by(YearsSinceLastPromotion) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+YearsSinceLastPromotiondf
+
+ggplot(data=YearsSinceLastPromotiondf,aes(x=YearsSinceLastPromotion,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("YearsSinceLastPromotion vs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1')+ geom_text(aes(x= YearsSinceLastPromotion, EmployeeCount +7, label = EmployeeCount, fill = NULL), data = YearsSinceLastPromotiondf)  
+
+ggplot(data, aes_string(x = "YearsSinceLastPromotion", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+  xlab("YearsSinceLastPromotion") + ylab("Percent numbers of employees") + ggtitle("YearsSinceLastPromotion vs Attrition")
+
+ggplot(data,aes_string(x= "YearsSinceLastPromotion" , y ="MonthlyIncome", fill ="YearsSinceLastPromotion" ))+geom_boxplot(fill=c('#971B1E'))+ggtitle("YearsSinceLastPromotion vs MonthlyIncome")
+
+```
+
+###Years With Current Manager.most have o and 2 years with current manager. after 12,13 15 and 17 has low attrition. 14 years might be people just got promoted to managerial level.
+
+```{r}
+data$YearsWithCurrManager <- as.factor(data$YearsWithCurrManager)
+YearsWithCurrManagerdf <-data %>% group_by(YearsWithCurrManager) %>% summarise(EmployeeCount =n(), Proportion = scales::percent(n()/dim(data)[1]))
+YearsWithCurrManagerdf 
+ggplot(data=YearsWithCurrManagerdf,aes(x=YearsWithCurrManager,y = EmployeeCount, fill = EmployeeCount ))+ geom_bar(stat ="identity")+ggtitle("YearsWithCurrManager vs EmployeeCount") + scale_fill_gradient2(low= '#971B1E', mid = '#E02124', high = '#FFF200', space='#E1E1E1')+ geom_text(aes(x= YearsWithCurrManager, EmployeeCount +7, label = EmployeeCount, fill = NULL), data = YearsWithCurrManagerdf)  
+
+
+ggplot(data, aes_string(x = "YearsWithCurrManager", fill = "Attrition")) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) + 
+   xlab("YearsWithCurrManager") + ylab("Percent numbers of employees") + ggtitle("YearsWithCurrManager vs Attrition")
+
+ggplot(data,aes_string(x= "YearsWithCurrManager" , y ="MonthlyIncome", fill ="YearsWithCurrManager" ))+geom_boxplot(fill=c('#971B1E'))+ggtitle("YearsWithCurrManager vs MonthlyIncome")
+
+```
+
+### Finding correlations between Daily Rate, Hourly Rate,Monthly rate and Monthly Income. there is no correlation between these variables. SO I will create data fram without these variable but Monthly income.
+```{r}
+
+data%>%select(Attrition,HourlyRate,DailyRate,MonthlyRate,MonthlyIncome)%>%ggpairs(aes(color= "Attrition"))
+
+```
+
+```{r}
+data <- read.csv("CaseStudy2-data.csv",header = TRUE)
+str(data)
+Newdata <- dplyr::select(data,-c("HourlyRate","DailyRate","MonthlyRate","ID","EmployeeNumber","Over18","EmployeeCount","StandardHours"))
+
+str(Newdata)
+###converting intergers that needed to be factor
+Newdata$EnvironmentSatisfaction <-as.numeric(Newdata$EnvironmentSatisfaction)
+Newdata$JobInvolvement <- factor(Newdata$JobInvolvement)
+Newdata$JobLevel <- as.numeric(Newdata$JobLevel)
+Newdata$JobSatisfaction <- factor(Newdata$JobSatisfaction)
+Newdata$PerformanceRating <- factor(Newdata$PerformanceRating)
+Newdata$RelationshipSatisfaction <- factor(Newdata$RelationshipSatisfaction)
+Newdata$WorkLifeBalance <- factor(Newdata$WorkLifeBalance)
+Newdata$StockOptionLevel <- as.numeric(Newdata$StockOptionLevel)
+
+##classifying factors and categorical variable.names
+###[,Newdata] <- lapply(data[,Newdata],as.numeric)
+cat <- Newdata%>% select_if(is.factor)
+con <- Newdata%>% select_if(is.numeric)
+
+```
+### Creating the correlations plots between each continous/numeric variables. Monthly income has better correlation with other numeric variables
+
+```{r}
+str(con)
+library(corrplot)
+con.cor <- cor(con)
+print(con.cor)
+corrplot(con.cor,type = "upper",order = "hclust",addCoef.col = "black",number.digits = 2,method = "shade",tl.srt=40, tl.cex = 0.8,tl.col = "black", number.cex = 0.7
+         , title = "Numeric Correlation")
+
+```
+
+
+
+```{r}
+set.seed(100)
+data2 <- dplyr::select(Newdata,"MonthlyIncome", "Age", "Attrition", "BusinessTravel", "Department", "Education", "JobLevel", "JobRole", "NumCompaniesWorked", "TotalWorkingYears", "YearsAtCompany", "YearsInCurrentRole", "YearsSinceLastPromotion", "YearsWithCurrManager","StockOptionLevel")
+head(data2)
+splitPerc1 = 0.8
+trainIndices1 = sample(1:dim(data2)[1],round(splitPerc1 * dim(data2)[1]))
+train1 = data2[trainIndices1,]
+test1 = data2[-trainIndices1,]
+lm1 = lm(MonthlyIncome ~ ., data = train1)
+summary(lm1)
+
+pred1 = predict(lm1, test1)
+RMSE = sqrt(mean((test1$MonthlyIncome - pred1)^2))
+RMSE
+
+```
+### Competition set No salary. predicted with significant variables in salary. 
+
+```{r}
+Nosalary <-readxl::read_xlsx("CaseStudy2CompSetNoSalary.xlsx")
+```
+
+```{r}
+Nosalary1 <-dplyr::select(Nosalary, "Age", "Attrition", "BusinessTravel", "Department", "Education", "JobLevel", "JobRole", "NumCompaniesWorked", "TotalWorkingYears", "YearsAtCompany", "YearsInCurrentRole", "YearsSinceLastPromotion", "YearsWithCurrManager","StockOptionLevel")
+
+lm2 = lm(MonthlyIncome ~ .,data = data2)
+summary(lm2)
+pred2 =predict(lm2,Nosalary1)
+MonthlyIncome = pred2
+pred2 = as.data.frame(MonthlyIncome)
+
+comsetwithsalary = cbind(pred2,Nosalary1)
+
+### this csv file will be submitted to GitHub. 
+write.csv(comsetwithsalary,"Case2PredictionsKarkiSalary.csv",row.names = TRUE)
+
+```
+
+
+
+###Naive Bayes classifier 
+```{r}
+library(e1071)
+data3 <- select(data,"Attrition", "Age", "Department",  "EnvironmentSatisfaction",  "JobInvolvement",  "JobLevel", "JobRole",  "JobSatisfaction", "MaritalStatus",  "MonthlyIncome", "NumCompaniesWorked",  "OverTime", "StockOptionLevel",  "TotalWorkingYears", "WorkLifeBalance", "YearsAtCompany", "YearsInCurrentRole", "YearsWithCurrManager")
+str(data3)
+data3$Attrition<-as.factor(data$Attrition)
+set.seed(1000)
+splitPerc2 = 0.8
+trainIndices2 = sample(1:dim(data3)[1],round(splitPerc1 * dim(data3)[1]))
+train2 = data3[trainIndices2,]
+test2 = data3[-trainIndices2,]
+Naive_Bayes<- naiveBayes(Attrition~.,data = train2,laplace = -1)
+predNB = predict(Naive_Bayes, test2)
+
+##str(data3)
+table((test2$Attrition),predNB)
+
+
+
+Con.Mat = confusionMatrix(predNB,test2$Attrition)
+Con.Mat
+
+```
+###since Naive base is 85 % sensitive and 62 % specific. I used this model to predict competition set with no attrition. 
+##Per Question- model has to be atleast 60 % sensitive and 60 % specific
+
+```{r}
+Noattrition <- read.csv("CaseStudy2CompSet No Attrition.csv",header = TRUE)
+str(Noattrition)
+Noattrition1 <- select(Noattrition,"Age", "Department",  "EnvironmentSatisfaction",  "JobInvolvement",  "JobLevel", "JobRole",  "JobSatisfaction", "MaritalStatus",  "MonthlyIncome", "NumCompaniesWorked",  "OverTime", "StockOptionLevel",  "TotalWorkingYears", "WorkLifeBalance", "YearsAtCompany", "YearsInCurrentRole", "YearsWithCurrManager")
+
+NaiveBayes2 <- naiveBayes(Attrition ~., data = data3, laplace = -1)
+pred3 =predict(NaiveBayes2,Noattrition1)
+Attrition = pred3
+Attrition = as.data.frame(Attrition)
+
+
+
+comsetwithattrition = cbind(Noattrition1,Attrition)
+
+write.csv(comsetwithattrition,"Case2PredictionsKarkiAttrition.csv",row.names = FALSE)
+```
+
+##Analyzing top 3
+```{r}
+
+str(Newdata)
+Newdata$Attrition <- as.factor(Newdata$Attrition)
+top3<- earth(Attrition ~., data = Newdata)
+I <- evimp(top3)
+I[1:3,c(3,4,6)]
+
+```
+##KNN is the worst predictor with Accuracy of 84 % . the sensitivity is 99% but specificity is only 37%
+```{r}
+
+
+data <- read.csv("CaseStudy2-data.csv",header = TRUE)
+Newdata2 <- select(data,-c("HourlyRate","DailyRate","MonthlyRate","ID","EmployeeNumber","Over18","EmployeeCount","StandardHours"))
+
+
+Newdata2$Attrition[Newdata2$Attrition =="Yes"]=1
+Newdata2$Attrition[Newdata2$Attrition =="No"]= 0
+Newdata2$Attrition = as.numeric(Newdata2$Attrition)
+
+str(Newdata2)
+
+dataknn <- select(Newdata2,"Attrition", "Age",  "EnvironmentSatisfaction",  "JobInvolvement",  "JobLevel",  "JobSatisfaction",  "MonthlyIncome", "NumCompaniesWorked", "StockOptionLevel",  "TotalWorkingYears", "WorkLifeBalance", "YearsAtCompany", "YearsInCurrentRole", "YearsWithCurrManager")
+str(dataknn)
+
+set.seed(100)
+splitPerc2 = 0.8
+trainIndices3 = sample(1:dim(dataknn)[1],round(splitPerc1 * dim(dataknn)[1]))
+train3= dataknn[trainIndices3,]
+test3 = dataknn[-trainIndices3,]
+classifications = knn(train3,test3,train3$Attrition, prob = TRUE, k = 10)
+  table(classifications,test3$Attrition)
+  CM = confusionMatrix(table(classifications,test3$Attrition))
+
+CM
+```
